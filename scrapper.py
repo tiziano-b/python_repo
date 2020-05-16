@@ -1,42 +1,49 @@
 from string import punctuation
 
-#MYSQLSTUFF
+#MYSQL
 import Database.DataModel as model
 import re
 import mysql.connector
 
-#TWITTER STUFF
+#TWITTER
 import tweepy
 import json
 
 #deal with API limitation
 import time
 
-#STOCK STUFF - http request
+#- http request
 import requests
-# -- save in csv and transport in MySQL
+# -- save in csv and load in MySQL
 import csv
 import pandas as pd
 import os
 
 
-class Database_connector:
+#
+# BASIC STARTING POINT TO SCRAP DATA AND LOAD IT INTO A DB.
+#
+
+
+class MySQL_helper:
     cur = None
     connection = None
 
     def __init__(self):
+
+        # credential 
         with open('database.json') as cred_data:
             info = json.load(cred_data)
             host_ = info['HOST_ADDRESS']
             user_ = info['USER_ID']
             password_ = info['PASSWORD']
             db_ = info['DB_CODE']
-        print("ciao")
         host = host_
         user = user_
         password = password_
         db = db_
 
+        # db connection
         cnx = mysql.connector.connect(host=host,
                 user=user,
                 password=password,database=db)
@@ -61,6 +68,7 @@ class Database_connector:
 
     def stock_price_daily_populator(self, stock_price_daily):
         try:
+            # info and saving 
             stock_price_daily.print()
             NAME = stock_price_daily.name
             TIMESTAMP = stock_price_daily.timestamp
@@ -83,6 +91,7 @@ class Database_connector:
 
     def stock_price_intraday_populator(self, stock_price_daily):
         try:
+            # info and saving
             stock_price_daily.print()
             NAME = stock_price_daily.name
             TIMESTAMP = stock_price_daily.timestamp
@@ -101,15 +110,13 @@ class Database_connector:
             # your changes.
             self.connection.commit()
         finally:
-            # close the connection
-            # self.connection.close()
             pass
 
 
 class Twitter_scrapper:
     def crawl_tweets_cashtag(self, cashtag, maximum_number_of_tweets_to_be_extracted, database):
 
-
+        # credential
         with open('twitter_credentials.json') as cred_data:
             info = json.load(cred_data)
             consumer_key = info['CONSUMER_KEY']
@@ -127,24 +134,19 @@ class Twitter_scrapper:
             try:
                 tweet = cursor.next()
 
+                # specific case, retweeted status
                 if 'retweeted_status' in dir(tweet):
                     scrapped_tweet = model.Tweet(tweet.id,cashtag,tweet.created_at,tweet.user.followers_count,tweet.user.friends_count,tweet.retweet_count,tweet.retweeted_status.full_text)
                     database.tweet_populator(scrapped_tweet)
-                    # print("-FUULL RETWEET")
-                    # print(tweet.retweeted_status.full_text)
-                    # print("-FUULL TEXT")
-                    # print(tweet.full_text)
 
                 # Insert into db
                 else:
                     scrapped_tweet = model.Tweet(tweet.id,cashtag,tweet.created_at,tweet.user.followers_count,tweet.user.friends_count,tweet.retweet_count,tweet.full_text)
                     database.tweet_populator(scrapped_tweet)
-                    #print("-FUULL RETWEET -- in no retweet")
-                    #print(tweet.retweeted_status.full_text)
-                    # print("-FUULL TEXT -- in no retweet")
-                    # print(tweet.full_text)
 
                 time.sleep(0)
+
+            # deal with API limitation
             except tweepy.TweepError:
                 print("EXCEPTION TIME TWITTER API - wait 15mins")
                 time.sleep(60 * 15)
@@ -202,16 +204,19 @@ class Stock_price_scrapper:
 
 
     def download_newStockPrice_intraday(self, hashtag, database):
+
+        # deal with API limitation
         startTime = time.time()
         print("~ deal with API limitation: 5 calls per minute")
         for i in range(0, 15):
             print(i)
-            # making delay for 1 second
+            # making delay ~ 1 second
             time.sleep(1)
         endTime = time.time()
         elapsedTime = endTime - startTime
         print("Elapsed Time = %s" % elapsedTime)
 
+        # credential loading
         with open('twitter_credentials.json') as cred_data:
             info = json.load(cred_data)
             API_KEY1 = info['alphavantage']
@@ -220,6 +225,7 @@ class Stock_price_scrapper:
         request_key = requests.get(
             'https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol='+hashtag+'&interval=5min&apikey='+API_KEY1 +'&datatype=csv')
 
+        # successfull request
         if (request_key.status_code == 200):
             for r in request_key:
                 print(r)
@@ -248,7 +254,7 @@ if __name__ == '__main__':
     CRAWL_STOCK_INTRADAY= False
     CRAWL_TWITTER = True
 
-    database = Database_connector()
+    database = MySQL_helper()
 
     stock_nasdaq_top100 = ['ATVI', 'ADBE', 'AMD', 'ALGN', 'ALXN','AMZN','AMGN', 'AAL','ADI','AAPL','AMAT','ASML',
                            'ADSK','ADP','AVGO','BIDU','BIIB','BMRN','CDNS','CELG','CERN','CHKP','CHTR','CTRP','CTAS',
